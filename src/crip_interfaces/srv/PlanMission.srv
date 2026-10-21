@@ -1,0 +1,7 @@
+# Submit a natural-language mission. The brain returns a grounded task plan.
+string  mission
+---
+bool    accepted
+string  rejection_reason     # set when accepted=false (e.g. unknown reference)
+crip_interfaces/Task[] tasks
+string  summary              # short natural-language summary of the plan

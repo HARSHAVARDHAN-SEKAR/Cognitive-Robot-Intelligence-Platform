@@ -1,0 +1,6 @@
+# Request an on-demand scene analysis of the latest camera frame.
+string  question      # optional focusing question; empty = general assessment
+---
+bool    ok
+string  error
+crip_interfaces/SceneAssessment assessment

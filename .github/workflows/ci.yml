@@ -1,0 +1,91 @@
+name: CRIP CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  # ---------------------------------------------------------------
+  # Job 1: fast logic tests -- pure-Python suites, no ROS required.
+  # Runs in seconds on every push; this is the always-on safety net.
+  # ---------------------------------------------------------------
+  logic-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install test dependencies
+        run: |
+          pip install pytest numpy fastapi httpx "uvicorn[standard]" pillow
+
+      - name: Compile every Python file
+        run: |
+          fail=0
+          for f in $(find src -name '*.py'); do
+            python -m py_compile "$f" || { echo "COMPILE FAIL: $f"; fail=1; }
+          done
+          exit $fail
+
+      - name: Run all ROS-free unit suites
+        run: |
+          set -e
+          (cd src/crip_world_model && PYTHONPATH=. pytest test/test_storage.py test/test_relations.py -q)
+          (cd src/crip_llm_brain   && PYTHONPATH=. pytest test/test_planner.py -q)
+          (cd src/crip_vlm         && PYTHONPATH=. pytest test/test_vlm.py -q)
+          (cd src/crip_prediction  && PYTHONPATH=. pytest test/test_prediction.py -q)
+          (cd src/crip_memory      && PYTHONPATH=. pytest test/test_memory.py -q)
+          (cd src/crip_learning    && PYTHONPATH=.:../crip_prediction pytest test/test_learning.py -q)
+          (cd src/crip_dashboard   && PYTHONPATH=. pytest test/test_dashboard.py test/test_health.py -q)
+          (cd src/crip_safety      && PYTHONPATH=. pytest test/test_safety.py test/test_confidence.py -q)
+          (cd src/crip_fleet       && PYTHONPATH=. pytest test/test_fleet.py -q)
+          (cd src/crip_explain     && PYTHONPATH=. pytest test/test_explain.py -q)
+
+      # RL env suite needs gymnasium; kept separate so a heavy dep never
+      # blocks the core suites.
+      - name: RL environment suite
+        run: |
+          pip install gymnasium
+          (cd src/crip_rl_nav && PYTHONPATH=. pytest test/test_env.py -q)
+
+      - name: Run logic benchmarks (report only)
+        run: |
+          python benchmarks/run_benchmarks.py || true
+
+  # ---------------------------------------------------------------
+  # Job 2: full ROS build -- colcon build + launch tests inside the
+  # official ros:jazzy container. This is the integration gate; the
+  # first CI run of this job is where rosidl/launch issues surface.
+  # ---------------------------------------------------------------
+  ros-build:
+    runs-on: ubuntu-latest
+    container:
+      image: ros:jazzy
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        shell: bash
+        run: |
+          apt-get update
+          apt-get install -y python3-pip python3-colcon-common-extensions
+          pip install --break-system-packages numpy pillow || true
+          rosdep update || true
+          rosdep install --from-paths src --ignore-src -r -y || true
+
+      - name: colcon build
+        shell: bash
+        run: |
+          source /opt/ros/jazzy/setup.bash
+          colcon build --symlink-install --event-handlers console_cohesion+
+
+      - name: colcon test (unit + launch tests)
+        shell: bash
+        run: |
+          source /opt/ros/jazzy/setup.bash
+          source install/setup.bash
+          colcon test --event-handlers console_cohesion+ || true
+          colcon test-result --verbose

@@ -1,0 +1,99 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- Material colors for Gazebo -->
+  <gazebo reference="base_link"><material>Gazebo/Blue</material></gazebo>
+  <gazebo reference="left_wheel"><material>Gazebo/Black</material></gazebo>
+  <gazebo reference="right_wheel"><material>Gazebo/Black</material></gazebo>
+  <gazebo reference="lidar_link"><material>Gazebo/Red</material></gazebo>
+  <gazebo reference="camera_link"><material>Gazebo/Green</material></gazebo>
+
+  <!-- BUGFIX (tipping): casters must SLIDE, not grip. With default friction a
+       fixed sphere digs into the ground, acts as a pivot, and flips the robot
+       onto its nose. mu=0 makes them behave like real ball casters. -->
+  <gazebo reference="caster">
+    <material>Gazebo/Black</material>
+    <mu1>0.05</mu1>
+    <mu2>0.05</mu2>
+  </gazebo>
+  <gazebo reference="caster_rear">
+    <material>Gazebo/Black</material>
+    <mu1>0.05</mu1>
+    <mu2>0.05</mu2>
+  </gazebo>
+
+  <!-- Drive wheels need GRIP (opposite of the casters) -->
+  <gazebo reference="left_wheel"><mu1>1.0</mu1><mu2>1.0</mu2></gazebo>
+  <gazebo reference="right_wheel"><mu1>1.0</mu1><mu2>1.0</mu2></gazebo>
+
+  <!-- ===== Differential Drive (gz-sim / ros_gz) ===== -->
+  <gazebo>
+    <plugin filename="gz-sim-diff-drive-system"
+            name="gz::sim::systems::DiffDrive">
+      <left_joint>left_wheel_joint</left_joint>
+      <right_joint>right_wheel_joint</right_joint>
+      <wheel_separation>0.40</wheel_separation>
+      <wheel_radius>0.10</wheel_radius>
+      <odom_publish_frequency>30</odom_publish_frequency>
+      <topic>cmd_vel</topic>
+      <odom_topic>odom</odom_topic>
+      <frame_id>odom</frame_id>
+      <child_frame_id>base_footprint</child_frame_id>
+      <!-- BUGFIX (RViz "No transform from [base_link]"): without tf_topic the
+           DiffDrive publishes odometry but NEVER the odom->base_footprint
+           transform, so RViz cannot place the robot and every link errors.
+           This line is what makes the TF tree complete. -->
+      <tf_topic>/tf</tf_topic>
+      <max_linear_acceleration>1.0</max_linear_acceleration>
+    </plugin>
+
+    <!-- Joint state publisher -->
+    <plugin filename="gz-sim-joint-state-publisher-system"
+            name="gz::sim::systems::JointStatePublisher">
+      <topic>joint_states</topic>
+    </plugin>
+  </gazebo>
+
+  <!-- ===== 2D LiDAR ===== -->
+  <gazebo reference="lidar_link">
+    <sensor name="lidar" type="gpu_lidar">
+      <update_rate>10</update_rate>
+      <topic>scan</topic>
+      <gz_frame_id>lidar_link</gz_frame_id>
+      <lidar>
+        <scan>
+          <horizontal>
+            <samples>360</samples>
+            <resolution>1</resolution>
+            <min_angle>-3.14159</min_angle>
+            <max_angle>3.14159</max_angle>
+          </horizontal>
+        </scan>
+        <range>
+          <min>0.12</min>
+          <max>12.0</max>
+          <resolution>0.01</resolution>
+        </range>
+      </lidar>
+      <always_on>1</always_on>
+      <visualize>true</visualize>
+    </sensor>
+  </gazebo>
+
+  <!-- ===== RGB Camera ===== -->
+  <gazebo reference="camera_link">
+    <sensor name="camera" type="camera">
+      <update_rate>15</update_rate>
+      <topic>camera/image_raw</topic>
+      <gz_frame_id>camera_optical</gz_frame_id>
+      <camera>
+        <horizontal_fov>1.089</horizontal_fov>
+        <image><width>640</width><height>480</height><format>R8G8B8</format></image>
+        <clip><near>0.05</near><far>15.0</far></clip>
+      </camera>
+      <always_on>1</always_on>
+      <visualize>true</visualize>
+    </sensor>
+  </gazebo>
+
+</robot>

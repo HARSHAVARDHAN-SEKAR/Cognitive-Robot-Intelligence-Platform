@@ -1,0 +1,6 @@
+# Store a mission experience in semantic memory.
+string  text                 # natural-language description of the experience
+string  metadata_json        # optional JSON blob (outcome, location, etc.)
+---
+bool    ok
+int32   id

@@ -1,0 +1,6 @@
+# Ask the robot why it recently did what it did.
+int32   top_k          # number of contributing factors (0 -> default 3)
+---
+string  summary        # one-line causal narrative
+string  primary_cause  # the single most decisive factor
+string[] factors        # contributing factor descriptions, chronological

@@ -1,0 +1,6 @@
+# Ask whether an object with this label has ever been observed.
+string  label
+---
+bool    seen
+int32   times_seen
+crip_interfaces/SemanticEntity closest   # most-confident match (empty if none)

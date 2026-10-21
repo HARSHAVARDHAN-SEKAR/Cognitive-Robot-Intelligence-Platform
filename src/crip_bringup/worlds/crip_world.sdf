@@ -1,0 +1,114 @@
+<?xml version="1.0" ?>
+<sdf version="1.10">
+  <world name="crip_world">
+    <physics name="1ms" type="ignored">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+    </physics>
+    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands"/>
+    <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
+    <plugin filename="gz-sim-sensors-system" name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+
+    <light type="directional" name="sun">
+      <cast_shadows>true</cast_shadows>
+      <pose>0 0 10 0 0 0</pose>
+      <diffuse>0.8 0.8 0.8 1</diffuse>
+      <specular>0.2 0.2 0.2 1</specular>
+      <direction>-0.5 0.1 -0.9</direction>
+    </light>
+
+    <model name="ground_plane"><static>true</static>
+      <link name="link">
+        <collision name="collision"><geometry><plane><normal>0 0 1</normal><size>100 100</size></plane></geometry></collision>
+        <visual name="visual"><geometry><plane><normal>0 0 1</normal><size>100 100</size></plane></geometry>
+        <material><ambient>0.8 0.8 0.8 1</ambient><diffuse>0.8 0.8 0.8 1</diffuse></material></visual>
+      </link>
+    </model>
+
+    <!-- ============ BIG ARENA: 16 x 16 m, walls at +/-8 ============ -->
+    <model name="wall_north"><static>true</static><pose>0 8 0.5 0 0 0</pose>
+      <link name="l"><collision name="c"><geometry><box><size>16.4 0.2 1</size></box></geometry></collision>
+      <visual name="v"><geometry><box><size>16.4 0.2 1</size></box></geometry>
+      <material><ambient>0.4 0.4 0.4 1</ambient><diffuse>0.4 0.4 0.4 1</diffuse></material></visual></link></model>
+    <model name="wall_south"><static>true</static><pose>0 -8 0.5 0 0 0</pose>
+      <link name="l"><collision name="c"><geometry><box><size>16.4 0.2 1</size></box></geometry></collision>
+      <visual name="v"><geometry><box><size>16.4 0.2 1</size></box></geometry>
+      <material><ambient>0.4 0.4 0.4 1</ambient><diffuse>0.4 0.4 0.4 1</diffuse></material></visual></link></model>
+    <model name="wall_east"><static>true</static><pose>8 0 0.5 0 0 0</pose>
+      <link name="l"><collision name="c"><geometry><box><size>0.2 16.4 1</size></box></geometry></collision>
+      <visual name="v"><geometry><box><size>0.2 16.4 1</size></box></geometry>
+      <material><ambient>0.4 0.4 0.4 1</ambient><diffuse>0.4 0.4 0.4 1</diffuse></material></visual></link></model>
+    <model name="wall_west"><static>true</static><pose>-8 0 0.5 0 0 0</pose>
+      <link name="l"><collision name="c"><geometry><box><size>0.2 16.4 1</size></box></geometry></collision>
+      <visual name="v"><geometry><box><size>0.2 16.4 1</size></box></geometry>
+      <material><ambient>0.4 0.4 0.4 1</ambient><diffuse>0.4 0.4 0.4 1</diffuse></material></visual></link></model>
+
+    <!-- ============ OBSTACLES: spread apart, >=2m gaps everywhere ============ -->
+    <model name="box_obstacle"><static>true</static><pose>4 3 0.5 0 0 0.3</pose>
+      <link name="l"><collision name="c"><geometry><box><size>1 1 1</size></box></geometry></collision>
+      <visual name="v"><geometry><box><size>1 1 1</size></box></geometry>
+      <material><ambient>0.6 0.35 0.1 1</ambient><diffuse>0.7 0.4 0.1 1</diffuse></material></visual></link></model>
+
+    <model name="cyl_obstacle"><static>true</static><pose>-4 -4 0.5 0 0 0</pose>
+      <link name="l"><collision name="c"><geometry><cylinder><radius>0.4</radius><length>1.0</length></cylinder></geometry></collision>
+      <visual name="v"><geometry><cylinder><radius>0.4</radius><length>1.0</length></cylinder></geometry>
+      <material><ambient>0.1 0.3 0.8 1</ambient><diffuse>0.1 0.3 0.8 1</diffuse></material></visual></link></model>
+
+    <!-- ============ SEMANTIC LANDMARKS (tall enough to be LiDAR obstacles,
+         never low ramps the robot can climb) ============ -->
+    <model name="charging_station"><static>true</static><pose>6.5 6.5 0.25 0 0 0</pose>
+      <link name="l"><collision name="c"><geometry><box><size>0.9 0.9 0.5</size></box></geometry></collision>
+      <visual name="v"><geometry><box><size>0.9 0.9 0.5</size></box></geometry>
+      <material><ambient>0.1 0.7 0.2 1</ambient><diffuse>0.1 0.8 0.2 1</diffuse></material></visual></link></model>
+
+    <model name="shelf_a"><static>true</static><pose>-6.5 3 0.75 0 0 0</pose>
+      <link name="l"><collision name="c"><geometry><box><size>0.5 2.0 1.5</size></box></geometry></collision>
+      <visual name="v"><geometry><box><size>0.5 2.0 1.5</size></box></geometry>
+      <material><ambient>0.8 0.7 0.1 1</ambient><diffuse>0.9 0.8 0.1 1</diffuse></material></visual></link></model>
+
+    <model name="shelf_b"><static>true</static><pose>-6.5 -1 0.75 0 0 0</pose>
+      <link name="l"><collision name="c"><geometry><box><size>0.5 2.0 1.5</size></box></geometry></collision>
+      <visual name="v"><geometry><box><size>0.5 2.0 1.5</size></box></geometry>
+      <material><ambient>0.8 0.7 0.1 1</ambient><diffuse>0.9 0.8 0.1 1</diffuse></material></visual></link></model>
+
+    <model name="inspection_table"><static>true</static><pose>5 -5.5 0.35 0 0 0</pose>
+      <link name="l"><collision name="c"><geometry><box><size>1.2 0.7 0.7</size></box></geometry></collision>
+      <visual name="v"><geometry><box><size>1.2 0.7 0.7</size></box></geometry>
+      <material><ambient>0.5 0.2 0.6 1</ambient><diffuse>0.6 0.2 0.7 1</diffuse></material></visual></link></model>
+
+    <model name="pallet"><static>true</static><pose>0 5 0.3 0 0 0</pose>
+      <link name="l"><collision name="c"><geometry><box><size>1.0 0.8 0.6</size></box></geometry></collision>
+      <visual name="v"><geometry><box><size>1.0 0.8 0.6</size></box></geometry>
+      <material><ambient>0.5 0.35 0.15 1</ambient><diffuse>0.6 0.4 0.2 1</diffuse></material></visual></link></model>
+
+    <model name="pillar"><static>true</static><pose>2 -2 0.75 0 0 0</pose>
+      <link name="l"><collision name="c"><geometry><cylinder><radius>0.25</radius><length>1.5</length></cylinder></geometry></collision>
+      <visual name="v"><geometry><cylinder><radius>0.25</radius><length>1.5</length></cylinder></geometry>
+      <material><ambient>0.6 0.6 0.65 1</ambient><diffuse>0.7 0.7 0.75 1</diffuse></material></visual></link></model>
+
+    <!-- Moving actor: larger loop for the larger arena. Skin mesh omitted on
+         purpose (a Fuel download stalls Gazebo offline); the pose stream on
+         dynamic_pose/info is all the prediction tracker consumes. -->
+    <actor name="walking_person">
+      <pose>0 5 0 0 0 0</pose>
+      <script>
+        <loop>true</loop>
+        <auto_start>true</auto_start>
+        <trajectory id="0" type="walk">
+          <waypoint><time>0</time>  <pose>5 5 1.0 0 0 -1.57</pose></waypoint>
+          <waypoint><time>8</time>  <pose>5 -5 1.0 0 0 -1.57</pose></waypoint>
+          <waypoint><time>9</time>  <pose>5 -5 1.0 0 0 3.14</pose></waypoint>
+          <waypoint><time>17</time> <pose>-5 -5 1.0 0 0 3.14</pose></waypoint>
+          <waypoint><time>18</time> <pose>-5 -5 1.0 0 0 1.57</pose></waypoint>
+          <waypoint><time>26</time> <pose>-5 5 1.0 0 0 1.57</pose></waypoint>
+          <waypoint><time>27</time> <pose>-5 5 1.0 0 0 0</pose></waypoint>
+          <waypoint><time>35</time> <pose>5 5 1.0 0 0 0</pose></waypoint>
+          <waypoint><time>36</time> <pose>5 5 1.0 0 0 -1.57</pose></waypoint>
+        </trajectory>
+      </script>
+    </actor>
+  </world>
+</sdf>

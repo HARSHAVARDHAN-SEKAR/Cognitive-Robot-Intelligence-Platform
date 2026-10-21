@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>CRIP Technical Report</title>
+<style>
+  @page { size: A4; margin: 22mm 20mm; }
+  * { box-sizing: border-box; }
+  body { font-family: "Helvetica Neue", Arial, sans-serif; color: #1a1a1a;
+         font-size: 10.5pt; line-height: 1.5; max-width: 720px; margin: 0 auto; }
+  h1 { font-size: 21pt; margin: 0 0 2pt; letter-spacing: -0.3pt; }
+  .sub { color: #555; font-size: 11pt; margin: 0 0 4pt; }
+  .meta { color: #777; font-size: 9pt; margin-bottom: 18pt;
+          border-bottom: 1.5px solid #d0d0d0; padding-bottom: 10pt; }
+  h2 { font-size: 13pt; margin: 20pt 0 6pt; padding-bottom: 3pt;
+       border-bottom: 1px solid #e0e0e0; }
+  h3 { font-size: 11pt; margin: 13pt 0 4pt; color: #222; }
+  p { margin: 0 0 8pt; }
+  table { border-collapse: collapse; width: 100%; margin: 8pt 0 12pt;
+          font-size: 9.5pt; }
+  th, td { border: 1px solid #ddd; padding: 5pt 8pt; text-align: left; }
+  th { background: #f4f4f2; font-weight: 600; }
+  td.n { text-align: right; font-variant-numeric: tabular-nums; }
+  code { font-family: "SF Mono", Consolas, monospace; font-size: 9pt;
+         background: #f4f4f2; padding: 1px 4px; border-radius: 3px; }
+  .box { background: #f7f7f5; border-left: 3px solid #888; padding: 8pt 12pt;
+         margin: 10pt 0; font-size: 9.5pt; }
+  .warn { border-left-color: #c0803a; background: #faf3e8; }
+  .ok { border-left-color: #4a8a5a; background: #eef6ef; }
+  ul { margin: 4pt 0 10pt; padding-left: 18pt; }
+  li { margin: 2pt 0; }
+  .foot { margin-top: 20pt; padding-top: 8pt; border-top: 1px solid #e0e0e0;
+          color: #888; font-size: 8.5pt; }
+</style>
+</head>
+<body>
+
+<h1>Cognitive Robot Intelligence Platform (CRIP)</h1>
+<p class="sub">A modular ROS 2 architecture for language-directed, self-improving autonomous navigation</p>
+<p class="meta">Technical Report &middot; 18 packages &middot; 94 Python modules &middot; 7,465 lines &middot; 113 unit tests</p>
+
+<h2>1. Abstract</h2>
+<p>CRIP is a simulated cognitive robotics platform that converts natural-language
+commands into safe, grounded, closed-loop robot behaviour, and improves from its
+own logged experience. It integrates twelve subsystems — perception, a persistent
+semantic world model, an LLM task planner, vision-language scene assessment,
+classical (Nav2) and learned (PPO) navigation, trajectory prediction, semantic
+memory, a gated self-learning loop, an operator dashboard, an auditable safety
+supervisor, and fleet-wide sharing with explainable decisions — across 18 ROS 2
+packages. Every AI component is backend-switchable with an offline fallback, so
+the system runs without API keys or GPU. This report documents the architecture,
+the verification performed, and — explicitly — the boundary between what is
+verified and what awaits integration testing.</p>
+
+<h2>2. Architecture</h2>
+<p>A mission flows top to bottom: a command enters via the dashboard; the LLM
+brain recalls similar past missions from semantic memory, produces a task plan,
+and grounds each referenced place against the world model (rejecting unknown
+references rather than hallucinating). Nav2 plans a path and emits velocity;
+perception, the VLM, and the trajectory predictor run continuously while moving.
+Every velocity command passes the safety supervisor before reaching the wheels.
+After the mission, the outcome is logged, feeding the self-learning loop, the
+fleet, and the explanation trace.</p>
+
+<h3>Design principles</h3>
+<ul>
+  <li><strong>Separation of logic from ROS.</strong> Each subsystem's decision
+  logic is a pure-Python core, unit-testable without a ROS graph; the ROS node
+  is a thin wrapper. This is why 113 tests run in seconds with no simulator.</li>
+  <li><strong>Backend-switchable AI.</strong> LLM, VLM, and embeddings select
+  between cloud (Anthropic), local (Ollama), and offline mock via environment
+  variables, defaulting to mock.</li>
+  <li><strong>Safety on the wire.</strong> Sources publish to
+  <code>/cmd_vel_raw</code>; the supervisor gates every command to
+  <code>/cmd_vel</code>. Nothing reaches actuators unchecked.</li>
+  <li><strong>Gated learning.</strong> Retrained models are promoted only if
+  they beat the current model on held-out data.</li>
+</ul>
+
+<h2>3. Verification performed</h2>
+<div class="box ok"><strong>Verified in this build environment (no ROS/Gazebo available):</strong>
+all 94 Python modules compile; 113 unit tests pass across 11 logic suites;
+real PPO and LSTM training executed with ONNX export matching the trained model
+to ~1e-8; the self-learning promotion gate correctly promoted an improved model
+and rejected a worse one; the safety engine's rule pipeline validated including
+the property that a safety veto is never re-accelerated by rate limiting; the
+FastAPI dashboard served and streamed state over WebSocket.</div>
+
+<div class="box warn"><strong>Not yet verified — requires a ROS 2 machine:</strong>
+the integrated simulation has never been executed. Gazebo launch, Nav2
+localization, the live multi-node graph, <code>rosidl</code> interface
+generation, and <code>ros_gz</code> bridge mappings are unverified. No demo
+video or real-hardware validation exists yet. The honest status is
+<em>logic verified, integration pending</em>.</div>
+
+<h2>4. Benchmark results</h2>
+<p>Logic-core throughput, measured with <code>benchmarks/run_benchmarks.py</code>
+(single core, no GPU). These measure component compute cost in isolation, not
+end-to-end mission latency. Control-path components must exceed the 20 Hz safety
+tick; all clear it by four to five orders of magnitude.</p>
+
+<table>
+<tr><th>Component</th><th>Throughput</th><th>Latency</th><th>Budget</th></tr>
+<tr><td>Safety engine (6-rule check)</td><td class="n">199,617 /s</td><td class="n">5.0 µs</td><td>&ge; 20 Hz</td></tr>
+<tr><td>Confidence fusion</td><td class="n">375,415 /s</td><td class="n">2.7 µs</td><td>&ge; 20 Hz</td></tr>
+<tr><td>Tracker update</td><td class="n">553,735 /s</td><td class="n">1.8 µs</td><td>&ge; 20 Hz</td></tr>
+<tr><td>Dashboard snapshot</td><td class="n">522,560 /s</td><td class="n">1.9 µs</td><td>&ge; 5 Hz</td></tr>
+<tr><td>Planner (mock)</td><td class="n">438,720 /s</td><td class="n">2.3 µs</td><td>per-mission</td></tr>
+<tr><td>Memory recall (500 rec.)</td><td class="n">55,342 /s</td><td class="n">18.1 µs</td><td>per-query</td></tr>
+<tr><td>Fleet share + merge</td><td class="n">85,112 /s</td><td class="n">11.7 µs</td><td>per-event</td></tr>
+<tr><td>Knowledge graph query</td><td class="n">32,879 /s</td><td class="n">30.4 µs</td><td>per-query</td></tr>
+</table>
+
+<h2>5. Testing and CI</h2>
+<p>113 pytest tests cover the logic cores. A GitHub Actions pipeline
+(<code>.github/workflows/ci.yml</code>) runs two jobs on every push: a fast
+<code>logic-tests</code> job (compile + all unit suites), and a
+<code>ros-build</code> job that runs <code>colcon build</code> and
+<code>colcon test</code> inside the official <code>ros:jazzy</code> container.
+The first green <code>ros-build</code> will constitute the first integration
+verification.</p>
+
+<h2>6. Robustness features</h2>
+<p>Beyond the core milestones, three hardening layers were added: a
+<strong>confidence manager</strong> that fuses per-module confidence and gates
+speed (act / degrade / hold, capped by the weakest critical source); a
+<strong>knowledge graph</strong> giving the world model typed relations
+(<code>bottle on table in kitchen</code>) with transitive queries; and a
+<strong>health monitor</strong> classifying every module ok / slow / stale /
+missing with alerts to the dashboard.</p>
+
+<h2>7. Limitations and next steps</h2>
+<ul>
+  <li><strong>Integration untested.</strong> The first task is
+  <code>colcon build</code> on a ROS 2 Jazzy machine (or via CI) and resolving
+  first-run <code>rosidl</code> / <code>ros_gz</code> issues.</li>
+  <li><strong>Models are proof-level.</strong> PPO and LSTM are trained as
+  demonstrations, not to convergence; production quality needs GPU training.</li>
+  <li><strong>AI backends default to mocks.</strong> Real reasoning requires
+  wiring Anthropic or a local Ollama model.</li>
+  <li><strong>No manipulation or GPS.</strong> The robot is a differential-drive
+  navigation-and-inspection base by design.</li>
+  <li><strong>Demo video pending</strong> the first integrated run.</li>
+</ul>
+
+<h2>8. Reproducibility</h2>
+<p>Logic tests, benchmarks, and model training reproduce on any machine with
+Python 3.12 (no ROS). The full build reproduces via
+<code>docker compose up --build</code> on a ROS 2 machine, or automatically in
+CI. Full steps: <code>docs/REPRODUCIBILITY.md</code>.</p>
+
+<p class="foot">Generated as project evidence. All performance figures are
+reproducible via the commands cited. The verified/unverified boundary is stated
+deliberately: this report describes a complete, tested architecture whose
+integration testing is the documented next phase, not a finished autonomous
+system.</p>
+
+</body>
+</html>

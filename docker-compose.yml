@@ -1,0 +1,75 @@
+# Runs CRIP simulation with GUI (Gazebo + RViz) on a Linux host.
+# Usage:
+#   xhost +local:root        # allow container to use your X server
+#   docker compose up --build
+#
+# A PostgreSQL service is included for the World Model (Milestone 2). The
+# crip container points CRIP_PG_DSN at it; if Postgres is down the node
+# transparently falls back to SQLite, so the stack still runs standalone.
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: crip_pg
+    environment:
+      - POSTGRES_USER=crip
+      - POSTGRES_PASSWORD=crip
+      - POSTGRES_DB=crip_world
+    ports:
+      - "5432:5432"
+    volumes:
+      - crip_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U crip -d crip_world"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  crip:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: crip:latest
+    container_name: crip
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - DISPLAY=${DISPLAY}
+      - QT_X11_NO_MITSHM=1
+      # Gazebo: run server-only when no display (set GUI=0), and never stall
+      # waiting on the online model fuel server.
+      - GZ_SIM_RESOURCE_PATH=/crip_ws/install/crip_bringup/share/crip_bringup/worlds
+      - NVIDIA_DRIVER_CAPABILITIES=all
+      - CRIP_PG_DSN=postgresql://crip:crip@127.0.0.1:5432/crip_world
+      # LLM brain backend: mock (default, offline) | anthropic | ollama
+      - CRIP_LLM_BACKEND=${CRIP_LLM_BACKEND:-mock}
+      # VLM backend: mock (default, offline) | anthropic | ollama
+      - CRIP_VLM_BACKEND=${CRIP_VLM_BACKEND:-mock}
+      - CRIP_VLM_MODEL=${CRIP_VLM_MODEL:-}
+      # Memory embedder: hashing (default, offline) | local | api
+      - CRIP_EMBED_BACKEND=${CRIP_EMBED_BACKEND:-hashing}
+      - CRIP_EMBED_MODEL=${CRIP_EMBED_MODEL:-}
+      - CRIP_EMBED_KEY=${CRIP_EMBED_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - CRIP_LLM_MODEL=${CRIP_LLM_MODEL:-}
+      - OLLAMA_HOST=${OLLAMA_HOST:-http://127.0.0.1:11434}
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - ./src:/crip_ws/src:rw          # live-edit source from host
+    network_mode: host
+    ipc: host
+    # Uses host networking, so Postgres is reached at 127.0.0.1:5432 (published
+    # above). If you switch to a bridge network, change the DSN host to
+    # 'postgres' (the service name) instead of 127.0.0.1.
+    # For NVIDIA GPUs, uncomment (requires nvidia-container-toolkit):
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+    command: ros2 launch crip_bringup mission.launch.py
+
+volumes:
+  crip_pgdata:

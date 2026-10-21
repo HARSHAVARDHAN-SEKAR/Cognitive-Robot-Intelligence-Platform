@@ -1,0 +1,141 @@
+<?xml version="1.0"?>
+<robot name="crip_robot" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- ============ Properties ============ -->
+  <xacro:property name="base_length" value="0.50"/>
+  <xacro:property name="base_width"  value="0.35"/>
+  <xacro:property name="base_height" value="0.15"/>
+  <xacro:property name="wheel_radius" value="0.10"/>
+  <xacro:property name="wheel_width"  value="0.05"/>
+  <xacro:property name="wheel_sep"    value="0.40"/>
+  <xacro:property name="mass_base"    value="10.0"/>
+  <xacro:property name="mass_wheel"   value="1.0"/>
+
+  <!-- ============ Inertial macros ============ -->
+  <xacro:macro name="box_inertia" params="m x y z">
+    <inertial>
+      <mass value="${m}"/>
+      <inertia ixx="${m*(y*y+z*z)/12.0}" ixy="0" ixz="0"
+               iyy="${m*(x*x+z*z)/12.0}" iyz="0"
+               izz="${m*(x*x+y*y)/12.0}"/>
+    </inertial>
+  </xacro:macro>
+
+  <xacro:macro name="cyl_inertia" params="m r l">
+    <inertial>
+      <mass value="${m}"/>
+      <inertia ixx="${m*(3*r*r+l*l)/12.0}" ixy="0" ixz="0"
+               iyy="${m*(3*r*r+l*l)/12.0}" iyz="0"
+               izz="${m*r*r/2.0}"/>
+    </inertial>
+  </xacro:macro>
+
+  <!-- ============ Base footprint ============ -->
+  <link name="base_footprint"/>
+
+  <link name="base_link">
+    <visual>
+      <geometry><box size="${base_length} ${base_width} ${base_height}"/></geometry>
+      <material name="blue"><color rgba="0.2 0.3 0.8 1.0"/></material>
+    </visual>
+    <collision>
+      <geometry><box size="${base_length} ${base_width} ${base_height}"/></geometry>
+    </collision>
+    <xacro:box_inertia m="${mass_base}" x="${base_length}" y="${base_width}" z="${base_height}"/>
+  </link>
+
+  <joint name="base_joint" type="fixed">
+    <parent link="base_footprint"/>
+    <child link="base_link"/>
+    <origin xyz="0 0 ${wheel_radius + base_height/2}" rpy="0 0 0"/>
+  </joint>
+
+  <!-- ============ Wheel macro ============ -->
+  <xacro:macro name="wheel" params="prefix y_reflect">
+    <link name="${prefix}_wheel">
+      <visual>
+        <origin rpy="${pi/2} 0 0"/>
+        <geometry><cylinder radius="${wheel_radius}" length="${wheel_width}"/></geometry>
+        <material name="black"><color rgba="0.1 0.1 0.1 1.0"/></material>
+      </visual>
+      <collision>
+        <origin rpy="${pi/2} 0 0"/>
+        <geometry><cylinder radius="${wheel_radius}" length="${wheel_width}"/></geometry>
+      </collision>
+      <xacro:cyl_inertia m="${mass_wheel}" r="${wheel_radius}" l="${wheel_width}"/>
+    </link>
+    <joint name="${prefix}_wheel_joint" type="continuous">
+      <parent link="base_link"/>
+      <child link="${prefix}_wheel"/>
+      <origin xyz="0 ${y_reflect*wheel_sep/2} ${-base_height/2}" rpy="0 0 0"/>
+      <axis xyz="0 1 0"/>
+    </joint>
+  </xacro:macro>
+
+  <xacro:wheel prefix="left"  y_reflect="1"/>
+  <xacro:wheel prefix="right" y_reflect="-1"/>
+
+  <!-- ============ Casters ============
+       BUGFIX: originally a single caster sat at the FRONT only, so the robot
+       had no rear support and tipped onto its nose in Gazebo (the drive wheels
+       are at the centre). Two casters (front + rear) make it a stable 4-point
+       stance. Friction is set to ~0 via the gazebo file so they slide freely
+       instead of dragging and flipping the robot. -->
+  <link name="caster">
+    <visual><geometry><sphere radius="${wheel_radius/2}"/></geometry></visual>
+    <collision><geometry><sphere radius="${wheel_radius/2}"/></geometry></collision>
+    <xacro:cyl_inertia m="0.2" r="${wheel_radius/2}" l="0.01"/>
+  </link>
+  <joint name="caster_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="caster"/>
+    <origin xyz="${base_length/2 - 0.05} 0 ${-base_height/2 - wheel_radius/2}" rpy="0 0 0"/>
+  </joint>
+
+  <link name="caster_rear">
+    <visual><geometry><sphere radius="${wheel_radius/2}"/></geometry></visual>
+    <collision><geometry><sphere radius="${wheel_radius/2}"/></geometry></collision>
+    <xacro:cyl_inertia m="0.2" r="${wheel_radius/2}" l="0.01"/>
+  </link>
+  <joint name="caster_rear_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="caster_rear"/>
+    <origin xyz="${-base_length/2 + 0.05} 0 ${-base_height/2 - wheel_radius/2}" rpy="0 0 0"/>
+  </joint>
+
+  <!-- ============ LiDAR ============ -->
+  <link name="lidar_link">
+    <visual><geometry><cylinder radius="0.04" length="0.05"/></geometry>
+      <material name="red"><color rgba="0.8 0.1 0.1 1"/></material></visual>
+    <collision><geometry><cylinder radius="0.04" length="0.05"/></geometry></collision>
+    <xacro:cyl_inertia m="0.1" r="0.04" l="0.05"/>
+  </link>
+  <joint name="lidar_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="lidar_link"/>
+    <origin xyz="${base_length/2 - 0.1} 0 ${base_height/2 + 0.03}" rpy="0 0 0"/>
+  </joint>
+
+  <!-- ============ Camera ============ -->
+  <link name="camera_link">
+    <visual><geometry><box size="0.03 0.08 0.03"/></geometry>
+      <material name="green"><color rgba="0.1 0.7 0.1 1"/></material></visual>
+    <collision><geometry><box size="0.03 0.08 0.03"/></geometry></collision>
+    <xacro:box_inertia m="0.05" x="0.03" y="0.08" z="0.03"/>
+  </link>
+  <joint name="camera_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="camera_link"/>
+    <origin xyz="${base_length/2} 0 ${base_height/2}" rpy="0 0 0"/>
+  </joint>
+  <link name="camera_optical"/>
+  <joint name="camera_optical_joint" type="fixed">
+    <parent link="camera_link"/>
+    <child link="camera_optical"/>
+    <origin xyz="0 0 0" rpy="${-pi/2} 0 ${-pi/2}"/>
+  </joint>
+
+  <!-- ============ Gazebo plugins ============ -->
+  <xacro:include filename="$(find crip_description)/urdf/crip_robot.gazebo.xacro"/>
+
+</robot>

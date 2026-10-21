@@ -1,0 +1,8 @@
+# Retrieve experiences semantically similar to a query.
+string  query
+int32   k                     # number of results (default 5 if 0)
+---
+bool    ok
+string[] texts
+float32[] scores
+string[] metadata_json

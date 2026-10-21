@@ -1,0 +1,9 @@
+# Query the world model for entities. Any filter left blank/zero is ignored.
+string  label            # exact label match (optional)
+string  category         # category match (optional)
+geometry_msgs/Point near # if max_distance > 0, only entities within range
+float32 max_distance     # metres; 0 = no spatial filter
+int32   max_results      # 0 = unlimited
+---
+crip_interfaces/SemanticEntity[] entities
+bool    found

@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CRIP · Operations</title>
+<style>
+  /* ---- tokens ----
+     field   #0d1a1f  deep slate-teal (not black; control-room glass)
+     panel   #122428
+     line    #203a40
+     ink     #cfe3e6  primary text
+     dim     #6f9298  secondary
+     amber   #f2a93b  robot / active / live
+     magenta #e0529c  PREDICTION (where the person will be)
+     cyan    #4fd1c5  goal / nav
+  */
+  :root{
+    --field:#0d1a1f; --panel:#122428; --line:#203a40;
+    --ink:#cfe3e6; --dim:#6f9298;
+    --amber:#f2a93b; --magenta:#e0529c; --cyan:#4fd1c5;
+    --risk-none:#4fd1c5; --risk-low:#9bd14f; --risk-medium:#f2a93b; --risk-high:#ff5d5d;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    background:var(--field); color:var(--ink);
+    font-family:"Space Grotesk",-apple-system,Segoe UI,Roboto,sans-serif;
+    font-size:14px; line-height:1.45;
+    display:grid; grid-template-rows:auto 1fr;
+  }
+  .mono{font-family:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
+  header{
+    display:flex; align-items:baseline; gap:16px;
+    padding:14px 22px; border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg,#102025,#0d1a1f);
+  }
+  header h1{font-size:15px; letter-spacing:.32em; font-weight:600; margin:0; text-transform:uppercase}
+  header .sub{color:var(--dim); font-size:11px; letter-spacing:.18em; text-transform:uppercase}
+  header .live{margin-left:auto; display:flex; align-items:center; gap:8px; color:var(--dim); font-size:11px; letter-spacing:.16em}
+  .dot{width:8px;height:8px;border-radius:50%;background:#3b5359;transition:background .3s}
+  .dot.on{background:var(--amber); box-shadow:0 0 10px var(--amber)}
+  main{display:grid; grid-template-columns:1.55fr 1fr; gap:1px; background:var(--line); min-height:0}
+  .stage{background:var(--field); position:relative; display:flex; flex-direction:column}
+  .side{background:var(--field); display:flex; flex-direction:column; min-height:0}
+  .label{font-size:10px; letter-spacing:.22em; text-transform:uppercase; color:var(--dim); padding:12px 16px 6px}
+  svg{flex:1; width:100%; height:100%; display:block}
+  /* mission control */
+  .mission{padding:14px 16px; border-bottom:1px solid var(--line)}
+  .mission form{display:flex; gap:8px}
+  .mission input{
+    flex:1; background:#0c171b; border:1px solid var(--line); color:var(--ink);
+    padding:10px 12px; border-radius:2px; font-size:13px; font-family:inherit;
+  }
+  .mission input:focus{outline:none; border-color:var(--amber)}
+  .mission button{
+    background:var(--amber); color:#10201f; border:0; padding:0 16px;
+    font-weight:600; letter-spacing:.06em; border-radius:2px; cursor:pointer; font-family:inherit;
+  }
+  .mission button:active{transform:translateY(1px)}
+  .stat-row{display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:var(--line); border-bottom:1px solid var(--line)}
+  .stat{background:var(--field); padding:12px 16px}
+  .stat .k{font-size:10px; letter-spacing:.18em; text-transform:uppercase; color:var(--dim)}
+  .stat .v{font-size:18px; margin-top:3px}
+  .risk-pill{display:inline-block; padding:1px 8px; border-radius:2px; font-size:12px; letter-spacing:.08em}
+  .feed{flex:1; overflow:auto; padding:4px 0 12px; min-height:0}
+  .ev{display:grid; grid-template-columns:46px 64px 1fr; gap:10px; padding:5px 16px; border-bottom:1px solid #16282d; font-size:12px}
+  .ev .t{color:var(--dim)}
+  .ev .src{font-size:10px; letter-spacing:.12em; text-transform:uppercase}
+  .src-vlm{color:var(--magenta)} .src-brain{color:var(--amber)}
+  .src-learning{color:var(--cyan)} .src-operator{color:var(--ink)}
+  .src-safety{color:var(--risk-high)}
+  .why{padding:10px 16px; border-bottom:1px solid var(--line); display:flex; gap:10px; align-items:baseline; font-size:13px; background:#0f1f23}
+  .why-k{font-size:10px; letter-spacing:.2em; text-transform:uppercase; color:var(--amber); flex:none}
+  #why{color:var(--ink)}
+  .fleet{font-size:10px; letter-spacing:.04em; color:var(--cyan); text-transform:none; margin-left:8px}
+  .legend{display:flex; gap:16px; padding:8px 16px; border-top:1px solid var(--line); font-size:11px; color:var(--dim)}
+  .legend i{display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:5px; vertical-align:middle}
+  @media (max-width:880px){ main{grid-template-columns:1fr; grid-template-rows:minmax(320px,1fr) auto} }
+  @media (prefers-reduced-motion:reduce){ *{transition:none!important} }
+</style>
+</head>
+<body>
+<header>
+  <h1>CRIP</h1>
+  <span class="sub">Cognitive Robot · Operations</span>
+  <div class="live"><span class="dot" id="dot"></span><span id="conn">connecting…</span></div>
+</header>
+<main>
+  <section class="stage">
+    <div class="label">Arena · live telemetry</div>
+    <svg id="map" viewBox="0 0 600 600" preserveAspectRatio="xMidYMid meet"></svg>
+    <div class="legend">
+      <span><i style="background:var(--amber)"></i>robot + trail</span>
+      <span><i style="background:var(--magenta)"></i>predicted person path</span>
+      <span><i style="background:var(--cyan)"></i>goal</span>
+      <span><i style="background:#2c4a50"></i>obstacle</span>
+    </div>
+  </section>
+  <section class="side">
+    <div class="mission">
+      <div class="label" style="padding:0 0 6px">Command</div>
+      <form id="mform">
+        <input id="mtext" placeholder="e.g. go to the charging station" autocomplete="off">
+        <button type="submit">Send</button>
+      </form>
+    </div>
+    <div class="stat-row">
+      <div class="stat"><div class="k">Pose</div><div class="v mono" id="pose">0.0, 0.0</div></div>
+      <div class="stat"><div class="k">Scene risk</div><div class="v"><span class="risk-pill" id="risk">none</span></div></div>
+      <div class="stat"><div class="k">Uptime</div><div class="v mono" id="uptime">0s</div></div>
+    </div>
+    <div class="why" id="whybox"><span class="why-k">Why</span><span id="why">—</span></div>
+    <div class="label">Activity <span id="fleet" class="fleet"></span></div>
+    <div class="feed" id="feed"></div>
+  </section>
+</main>
+<script>
+const M = 600, HALF = 8.0, PAD = 40;          // map px, arena half-extent (m)
+const map = document.getElementById('map');
+const NS = 'http://www.w3.org/2000/svg';
+// world(m) -> svg(px); y up in world, down in svg
+function wx(x){ return PAD + (x + HALF) / (2*HALF) * (M - 2*PAD); }
+function wy(y){ return PAD + (HALF - y) / (2*HALF) * (M - 2*PAD); }
+function el(tag, attrs){ const e=document.createElementNS(NS,tag); for(const k in attrs) e.setAttribute(k,attrs[k]); return e; }
+
+function drawStatic(obstacles){
+  // grid
+  for(let g=-HALF; g<=HALF; g++){
+    map.appendChild(el('line',{x1:wx(g),y1:wy(-HALF),x2:wx(g),y2:wy(HALF),stroke:'#16282d','stroke-width':1}));
+    map.appendChild(el('line',{x1:wx(-HALF),y1:wy(g),x2:wx(HALF),y2:wy(g),stroke:'#16282d','stroke-width':1}));
+  }
+  map.appendChild(el('rect',{x:wx(-HALF),y:wy(HALF),width:wx(HALF)-wx(-HALF),height:wy(-HALF)-wy(HALF),fill:'none',stroke:'#203a40','stroke-width':1.5}));
+  (obstacles||[]).forEach(o=>{
+    const px=wx(o.x), py=wy(o.y), r=(o.r/(2*HALF))*(M-2*PAD);
+    if(o.shape==='box') map.appendChild(el('rect',{x:px-r,y:py-r,width:2*r,height:2*r,fill:'#1b3238',stroke:'#2c4a50','stroke-width':1.5,rx:2}));
+    else map.appendChild(el('circle',{cx:px,cy:py,r:r,fill:'#1b3238',stroke:'#2c4a50','stroke-width':1.5}));
+  });
+}
+const layer = el('g',{}); // dynamic layer redrawn each frame
+let staticDrawn=false;
+
+function render(s){
+  if(!staticDrawn){ drawStatic(s.obstacles); map.appendChild(layer); staticDrawn=true; }
+  while(layer.firstChild) layer.removeChild(layer.firstChild);
+
+  // motion trail (fading)
+  const tr=s.trail||[];
+  for(let i=1;i<tr.length;i++){
+    const a=Math.max(0.05, i/tr.length*0.6);
+    layer.appendChild(el('line',{x1:wx(tr[i-1][0]),y1:wy(tr[i-1][1]),x2:wx(tr[i][0]),y2:wy(tr[i][1]),stroke:'#f2a93b','stroke-opacity':a,'stroke-width':2}));
+  }
+  // goal
+  if(s.goal){ const gx=wx(s.goal.x),gy=wy(s.goal.y);
+    layer.appendChild(el('circle',{cx:gx,cy:gy,r:9,fill:'none',stroke:'#4fd1c5','stroke-width':2}));
+    layer.appendChild(el('line',{x1:gx-13,y1:gy,x2:gx+13,y2:gy,stroke:'#4fd1c5','stroke-width':1}));
+    layer.appendChild(el('line',{x1:gx,y1:gy-13,x2:gx,y2:gy+13,stroke:'#4fd1c5','stroke-width':1}));
+  }
+  // predictions: where the person WILL be — the signature element
+  for(const id in (s.predictions||{})){
+    const pts=s.predictions[id]; if(!pts||pts.length<2) continue;
+    let d='M '+wx(pts[0][0])+' '+wy(pts[0][1]);
+    for(let i=1;i<pts.length;i++) d+=' L '+wx(pts[i][0])+' '+wy(pts[i][1]);
+    layer.appendChild(el('path',{d:d,fill:'none',stroke:'#e0529c','stroke-width':2.5,'stroke-dasharray':'2 6','stroke-linecap':'round'}));
+    const last=pts[pts.length-1];
+    layer.appendChild(el('circle',{cx:wx(last[0]),cy:wy(last[1]),r:6,fill:'none',stroke:'#e0529c','stroke-width':2}));
+    // current position of the tracked person
+    layer.appendChild(el('circle',{cx:wx(pts[0][0]),cy:wy(pts[0][1]),r:5,fill:'#e0529c'}));
+  }
+  // robot + heading
+  if(s.robot){
+    const rx=wx(s.robot.x), ry=wy(s.robot.y), yaw=s.robot.yaw||0;
+    layer.appendChild(el('circle',{cx:rx,cy:ry,r:9,fill:'#f2a93b'}));
+    layer.appendChild(el('circle',{cx:rx,cy:ry,r:15,fill:'none',stroke:'#f2a93b','stroke-opacity':0.4,'stroke-width':1.5}));
+    layer.appendChild(el('line',{x1:rx,y1:ry,x2:rx+Math.cos(-yaw)*18,y2:ry+Math.sin(-yaw)*18,stroke:'#10201f','stroke-width':2.5}));
+  }
+
+  // side panels
+  document.getElementById('pose').textContent =
+    (s.robot?s.robot.x.toFixed(2):'0')+', '+(s.robot?s.robot.y.toFixed(2):'0');
+  const risk=(s.vlm&&s.vlm.risk)||'none';
+  const rp=document.getElementById('risk');
+  rp.textContent=risk;
+  rp.style.background='var(--risk-'+risk+')'; rp.style.color='#10201f';
+  document.getElementById('uptime').textContent=Math.round(s.uptime||0)+'s';
+  document.getElementById('why').textContent = s.why || '—';
+  document.getElementById('fleet').textContent = s.fleet || '';
+
+  const feed=document.getElementById('feed');
+  feed.innerHTML='';
+  (s.events||[]).slice().reverse().forEach(e=>{
+    const row=el('div',{class:'ev'});
+    const t=document.createElement('span'); t.className='t mono'; t.textContent=e.t+'s';
+    const src=document.createElement('span'); src.className='src src-'+e.source; src.textContent=e.source;
+    const tx=document.createElement('span'); tx.textContent=e.text;
+    row.append(t,src,tx); feed.appendChild(row);
+  });
+}
+
+// websocket
+let ws;
+function connect(){
+  ws=new WebSocket('ws://'+location.host+'/ws');
+  ws.onopen=()=>{document.getElementById('dot').classList.add('on');document.getElementById('conn').textContent='live';};
+  ws.onclose=()=>{document.getElementById('dot').classList.remove('on');document.getElementById('conn').textContent='reconnecting…';setTimeout(connect,1500);};
+  ws.onmessage=ev=>{ try{ render(JSON.parse(ev.data)); }catch(e){} };
+}
+connect();
+
+document.getElementById('mform').addEventListener('submit',async ev=>{
+  ev.preventDefault();
+  const inp=document.getElementById('mtext'); const v=inp.value.trim(); if(!v) return;
+  inp.value='';
+  try{ await fetch('/mission',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({mission:v})}); }
+  catch(e){}
+});
+</script>
+</body>
+</html>
